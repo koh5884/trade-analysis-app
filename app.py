@@ -16,6 +16,8 @@ from modules.trade_plot import plot_trade_chart
 # 設定インポート
 import config
 
+st.write("✅ app.py reached")
+
 
 # ページ設定
 st.set_page_config(
