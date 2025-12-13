@@ -1,6 +1,9 @@
+import streamlit as st
+st.write("✅ app.py reached")
+
 """
 トレード分析アプリ - Streamlit メイン
-"""
+
 
 import streamlit as st
 import pandas as pd
@@ -211,3 +214,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+"""
