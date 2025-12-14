@@ -1,3 +1,7 @@
+st.write("NOTION_TOKEN exists:", bool(config.NOTION_TOKEN))
+st.write("DB IDs:", config.DATABASE_IDS)
+
+
 
 # トレード分析アプリ - Streamlit メイン
 
