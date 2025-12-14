@@ -108,12 +108,12 @@ def plot_win_loss_distribution(df):
     if wins > 0:
         labels.append(f'Win ({wins})')
         sizes.append(wins)
-        colors.append('green')
+        colors.append('red')
     
     if losses > 0:
         labels.append(f'Loss ({losses})')
         sizes.append(losses)
-        colors.append('red')
+        colors.append('green')
     
     if breakeven > 0:
         labels.append(f'Even ({breakeven})')

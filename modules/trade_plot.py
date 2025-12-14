@@ -60,8 +60,8 @@ def plot_candlestick(ax, df):
         if any(pd.isna(x) for x in [open_price, close_price, high_price, low_price]):
             continue
         
-        # 陽線: 緑、陰線: 赤
-        color = 'green' if close_price >= open_price else 'red'
+        # 陽線: 赤、陰線: 緑
+        color = 'red' if close_price >= open_price else 'green'
         
         # ヒゲ（高値-安値）
         ax.plot([i, i], [low_price, high_price], color='black', linewidth=1)
