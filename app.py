@@ -140,7 +140,12 @@ def main():
     elif view_mode == "📈 個別トレード":
         st.header("📈 個別トレード結果")
 
-        summary_table = get_trade_summary_table(df, unrealized_df)
+        summary_table = (
+            get_trade_summary_table(df, unrealized_df)
+            .sort_values("買付日", ascending=False)
+            .reset_index(drop=True)
+        )
+
 
         if summary_table.empty:
             st.warning("⚠️ トレードデータがありません")
