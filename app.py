@@ -9,7 +9,6 @@ from modules.notion_sync import sync_all_databases
 from modules.data_loader import (
     load_trade_data,
     calculate_unrealized_pnl,
-    get_all_trades_with_status,
 )
 from modules.kpi import (
     calculate_kpis,
@@ -44,7 +43,7 @@ def main():
     with st.sidebar:
         st.header("⚙️ 設定")
 
-        # Notion同期ボタン
+        # Notion → GitHub 同期
         if st.button("🔄 Notion → GitHub 同期", use_container_width=True):
             with st.spinner("同期中..."):
                 try:
@@ -72,7 +71,7 @@ def main():
 
         st.markdown("---")
 
-        # 市場選択
+        # 市場
         market = st.selectbox("市場", ["日本", "米国"], index=0)
         market_key = "japan" if market == "日本" else "us"
 
@@ -87,16 +86,16 @@ def main():
         st.warning("⚠️ データがありません。Notion同期を実行してください。")
         return
 
-    # 保有中含み損益
+    # 含み損益
     unrealized_df = calculate_unrealized_pnl(df, market_key)
 
-    # KPI計算
+    # KPI
     capital = config.CAPITAL[market_key]
     kpis = calculate_kpis(df, unrealized_df, capital)
 
-    # =================================================================
-    # ======================= 📊 総合サマリー ==========================
-    # =================================================================
+    # ======================================================================
+    # 📊 総合サマリー
+    # ======================================================================
     if view_mode == "📊 総合サマリー":
         st.header("📊 総合サマリー")
 
@@ -118,7 +117,9 @@ def main():
 
         st.markdown("---")
 
-        tab1, tab2, tab3 = st.tabs(["💹 損益棒グラフ", "📈 資金推移", "🍰 勝敗分布"])
+        tab1, tab2, tab3 = st.tabs(
+            ["💹 損益棒グラフ", "📈 資金推移", "🍰 勝敗分布"]
+        )
 
         with tab1:
             st.subheader("トレード別損益")
@@ -133,9 +134,9 @@ def main():
             st.subheader("勝敗分布")
             st.pyplot(plot_win_loss_distribution(df))
 
-    # =================================================================
-    # ======================= 📈 個別トレード ==========================
-    # =================================================================
+    # ======================================================================
+    # 📈 個別トレード（表クリック式UI）
+    # ======================================================================
     elif view_mode == "📈 個別トレード":
         st.header("📈 個別トレード結果")
 
@@ -145,8 +146,9 @@ def main():
             st.warning("⚠️ トレードデータがありません")
             return
 
-        col_table, col_chart = st.columns([1.2, 2.0])
+        col_table, col_chart = st.columns([1.3, 2.0])
 
+        # ===== 左：一覧テーブル =====
         with col_table:
             st.subheader("📋 トレード一覧（クリックで選択）")
 
@@ -164,6 +166,7 @@ def main():
 
             selected_summary = summary_table.iloc[event.selection.rows[0]]
 
+        # ===== 右：チャート =====
         with col_chart:
             ticker_code = selected_summary["証券コード"]
             buy_date = pd.to_datetime(selected_summary["買付日"])
@@ -173,7 +176,9 @@ def main():
                 & (df["買付日"] == buy_date)
             ].iloc[0]
 
-            st.subheader(f"📊 {selected_summary['銘柄名']} ({ticker_code})")
+            st.subheader(
+                f"📊 {selected_summary['銘柄名']} ({ticker_code})"
+            )
 
             col1, col2, col3 = st.columns(3)
             col1.metric("ステータス", selected_summary["ステータス"])
