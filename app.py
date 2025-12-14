@@ -1,5 +1,5 @@
 
-トレード分析アプリ - Streamlit メイン
+# トレード分析アプリ - Streamlit メイン
 
 
 import streamlit as st
