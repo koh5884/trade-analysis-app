@@ -1,7 +1,4 @@
-import streamlit as st
-st.write("✅ app.py reached")
 
-"""
 トレード分析アプリ - Streamlit メイン
 
 
@@ -18,8 +15,6 @@ from modules.trade_plot import plot_trade_chart
 
 # 設定インポート
 import config
-
-st.write("✅ app.py reached")
 
 
 # ページ設定
@@ -215,4 +210,3 @@ def main():
 if __name__ == "__main__":
     main()
 
-"""
