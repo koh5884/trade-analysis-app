@@ -19,10 +19,6 @@ from modules.trade_plot import plot_trade_chart
 import config
 
 
-st.write("NOTION_TOKEN exists:", bool(config.NOTION_TOKEN))
-st.write("DB IDs:", config.DATABASE_IDS)
-
-
 # ページ設定
 st.set_page_config(
     page_title="トレード分析アプリ",
