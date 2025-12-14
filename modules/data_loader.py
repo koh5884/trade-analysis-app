@@ -38,6 +38,13 @@ def load_trade_data(data_dir, market, style):
         if col in df.columns:
             df[col] = df[col].fillna(0)
     
+    # 増減率が0または空の場合、自動計算
+    if '増減率' in df.columns and '実現損益' in df.columns and '買付約定代金' in df.columns:
+        for idx, row in df.iterrows():
+            if pd.isna(row['増減率']) or row['増減率'] == 0:
+                if row['買付約定代金'] > 0:
+                    df.at[idx, '増減率'] = (row['実現損益'] / row['買付約定代金']) * 100
+    
     return df
 
 
@@ -103,6 +110,14 @@ def get_current_price(ticker_code, market):
 
 def calculate_unrealized_pnl(df, market):
     """保有中銘柄の含み損益を計算"""
+    
+    # DataFrameが空またはステータスカラムがない場合
+    if df.empty or 'ステータス' not in df.columns:
+        print(f"⚠️  データが空またはステータスカラムがありません")
+        print(f"   DataFrame shape: {df.shape}")
+        print(f"   Columns: {df.columns.tolist() if not df.empty else 'empty'}")
+        return pd.DataFrame()
+    
     holding_trades = df[df['ステータス'] == '保有中'].copy()
     
     if holding_trades.empty:
