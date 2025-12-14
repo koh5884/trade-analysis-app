@@ -30,9 +30,9 @@ def plot_pnl_bar(df, market='japan'):
     
     fig, ax = plt.subplots(figsize=(12, 6))
     
-    # 色分け: プラスは緑、マイナスは赤
-    colors = ['green' if x > 0 else 'red' for x in closed['実現損益']]
-    
+    # 色分け: プラスは赤、マイナスは緑（日本株・トレード慣習）
+    colors = ['red' if x > 0 else 'green' for x in closed['実現損益']]
+
     ax.bar(range(len(closed)), closed['実現損益'], color=colors, alpha=0.7, edgecolor='black')
     
     ax.axhline(0, color='black', linewidth=0.8, linestyle='--')
