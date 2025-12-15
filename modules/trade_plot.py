@@ -1,5 +1,5 @@
 """
-個別トレードのローソク足チャート（約定価格 + 当日OHLC対応）
+個別トレードのローソク足チャート（約定価格・当日OHLC対応）
 """
 
 import matplotlib.pyplot as plt
@@ -7,60 +7,87 @@ import yfinance as yf
 import pandas as pd
 from datetime import timedelta
 
+# 日本語フォント設定
 plt.rcParams["font.family"] = ["DejaVu Sans", "Arial", "sans-serif"]
 plt.rcParams["axes.unicode_minus"] = False
 
 
-def get_stock_data(ticker_code, start_date, end_date, market, include_today=False):
+def get_stock_data(
+    ticker_code,
+    start_date,
+    end_date,
+    market,
+    include_today=False,
+):
     """
-    日足 +（必要なら）当日OHLCを合成
+    yfinanceで株価データ取得
+    - 保有中の場合は当日の1分足からOHLCを生成
     """
-    ticker_code = str(ticker_code).replace(".0", "")
-    if market == "japan":
-        ticker_code = f"{ticker_code}.T"
+    try:
+        ticker_code = str(ticker_code).replace(".0", "")
+        if market == "japan":
+            ticker_code = f"{ticker_code}.T"
 
-    ticker = yf.Ticker(ticker_code)
+        ticker = yf.Ticker(ticker_code)
 
-    # === 日足 ===
-    daily = ticker.history(
-        start=start_date,
-        end=end_date,
-        interval="1d",
-        auto_adjust=False,
-    )
-
-    if daily.empty:
-        return None
-
-    if daily.index.tz is not None:
-        daily.index = daily.index.tz_localize(None)
-
-    # === 当日足（保有中のみ）===
-    if include_today:
-        intraday = ticker.history(
-            period="1d",
-            interval="1m",
+        # 日足
+        daily = ticker.history(
+            start=start_date,
+            end=end_date,
             auto_adjust=False,
         )
 
-        if not intraday.empty:
-            if intraday.index.tz is not None:
-                intraday.index = intraday.index.tz_localize(None)
+        if daily.empty:
+            return None
 
-            today = intraday.index[-1].normalize()
+        # timezone除去（超重要）
+        if daily.index.tz is not None:
+            daily.index = daily.index.tz_localize(None)
 
-            o = intraday.iloc[0]["Open"]
-            h = intraday["High"].max()
-            l = intraday["Low"].min()
-            c = intraday.iloc[-1]["Close"]
-            v = intraday["Volume"].sum()
+        # === 当日足を追加（保有中のみ）===
+        if include_today:
+            intraday = ticker.history(
+                period="1d",
+                interval="1m",
+                auto_adjust=False,
+            )
 
-            daily.loc[today] = [o, h, l, c, v, None, None]
+            if not intraday.empty:
+                if intraday.index.tz is not None:
+                    intraday.index = intraday.index.tz_localize(None)
 
-    return daily.sort_index()
+                today = intraday.index[-1].normalize()
+
+                o = intraday.iloc[0]["Open"]
+                h = intraday["High"].max()
+                l = intraday["Low"].min()
+                c = intraday.iloc[-1]["Close"]
+                v = intraday["Volume"].sum()
+
+                # ★ 列名ベースで安全に追加
+                row = pd.Series(index=daily.columns, dtype="float64")
+                row["Open"] = o
+                row["High"] = h
+                row["Low"] = l
+                row["Close"] = c
+
+                if "Volume" in daily.columns:
+                    row["Volume"] = v
+                if "Adj Close" in daily.columns:
+                    row["Adj Close"] = c
+
+                daily.loc[today] = row
+
+        daily = daily.sort_index()
+        return daily
+
+    except Exception as e:
+        print(f"❌ 株価取得エラー ({ticker_code}): {e}")
+        return None
 
 
 def plot_candlestick(ax, df):
+    """ローソク足描画"""
     width = 0.6
     df = df.reset_index(drop=True)
 
@@ -70,9 +97,13 @@ def plot_candlestick(ax, df):
         if pd.isna([o, h, l, c]).any():
             continue
 
+        # 日本式：陽線＝赤、陰線＝緑
         color = "red" if c >= o else "green"
+
+        # ヒゲ
         ax.plot([i, i], [l, h], color="black", linewidth=1)
 
+        # ボディ
         bottom = min(o, c)
         height = abs(c - o)
 
@@ -92,7 +123,12 @@ def plot_candlestick(ax, df):
 
 
 def plot_trade_chart(trade_row, market, lookback_days=20):
+    """
+    個別トレードチャート（約定価格を正確に反映）
+    """
+
     ticker = trade_row["証券コード"]
+
     entry_date = pd.to_datetime(trade_row["買付日"]).normalize()
     exit_date = (
         pd.to_datetime(trade_row["売付日"]).normalize()
@@ -105,7 +141,7 @@ def plot_trade_chart(trade_row, market, lookback_days=20):
     status = trade_row["ステータス"]
 
     start = entry_date - timedelta(days=lookback_days + 10)
-    end = pd.Timestamp.today() + timedelta(days=1)
+    end = (exit_date + timedelta(days=5)) if exit_date else pd.Timestamp.today()
 
     stock = get_stock_data(
         ticker,
@@ -115,37 +151,57 @@ def plot_trade_chart(trade_row, market, lookback_days=20):
         include_today=(status == "保有中"),
     )
 
-    if stock is None:
+    if stock is None or stock.empty:
         fig, ax = plt.subplots(figsize=(12, 6))
         ax.text(0.5, 0.5, "No price data", ha="center", va="center")
         ax.axis("off")
         return fig
 
     fig, ax = plt.subplots(figsize=(14, 7))
+
     plot_candlestick(ax, stock)
 
     dates = stock.index
 
+    # === エントリー（約定価格）===
     entry_idx = dates.get_indexer([entry_date], method="nearest")[0]
-    ax.scatter(entry_idx, entry_price, marker="^", s=220,
-               color="blue", edgecolors="black", zorder=5, label="Entry")
+    ax.scatter(
+        entry_idx,
+        entry_price,
+        marker="^",
+        s=220,
+        color="blue",
+        edgecolors="black",
+        zorder=6,
+        label="Entry (約定)",
+    )
     ax.axhline(entry_price, color="blue", linestyle="--", alpha=0.4)
 
+    # === エグジット（約定価格）===
     if exit_date is not None and exit_price is not None:
         exit_idx = dates.get_indexer([exit_date], method="nearest")[0]
-        ax.scatter(exit_idx, exit_price, marker="v", s=220,
-                   color="orange", edgecolors="black", zorder=5, label="Exit")
+        ax.scatter(
+            exit_idx,
+            exit_price,
+            marker="v",
+            s=220,
+            color="orange",
+            edgecolors="black",
+            zorder=6,
+            label="Exit (約定)",
+        )
         ax.axhline(exit_price, color="orange", linestyle="--", alpha=0.4)
 
+    # === 保有中マーカー ===
     if status == "保有中":
         ax.scatter(
             len(stock) - 1,
             stock.iloc[-1]["Close"],
             marker="*",
-            s=320,
+            s=300,
             color="gold",
             edgecolors="black",
-            zorder=6,
+            zorder=7,
             label="Current",
         )
 
