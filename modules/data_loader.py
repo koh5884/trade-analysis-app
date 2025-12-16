@@ -4,13 +4,16 @@
 
 import pandas as pd
 import os
-from datetime import datetime, timedelta
 import yfinance as yf
 import warnings
+from datetime import datetime, timedelta
 
 warnings.filterwarnings("ignore")
 
 
+# =====================================================
+# CSV 読み込み
+# =====================================================
 def load_trade_data(data_dir, market, style):
     """
     CSVからトレードデータを読み込み
@@ -25,25 +28,25 @@ def load_trade_data(data_dir, market, style):
 
     df = pd.read_csv(filepath)
 
-    # 証券コードを文字列に変換
+    # 証券コードを文字列化
     if "証券コード" in df.columns:
         df["証券コード"] = (
             df["証券コード"].astype(str).str.replace(".0", "", regex=False)
         )
 
-    # 日付型
+    # 日付型変換
     for col in ["買付日", "売付日"]:
         if col in df.columns:
             df[col] = pd.to_datetime(df[col], errors="coerce")
 
-    # 数値NaN補完（売却済用）
+    # 数値 NaN 補完（売却済用）
     numeric_columns = ["売付単価", "売付約定代金", "実現損益", "増減率"]
     for col in numeric_columns:
         if col in df.columns:
             df[col] = df[col].fillna(0)
 
-    # 増減率が未計算なら算出（売却済のみ）
-    if {"実現損益", "買付約定代金", "増減率"}.issubset(df.columns):
+    # 売却済トレードの増減率を補完
+    if {"ステータス", "実現損益", "買付約定代金", "増減率"}.issubset(df.columns):
         for idx, row in df.iterrows():
             if row["ステータス"] == "売却済":
                 if row["買付約定代金"] > 0 and row["増減率"] == 0:
@@ -55,10 +58,12 @@ def load_trade_data(data_dir, market, style):
 
 
 # =====================================================
-# 現在価格取得（できるだけリアルタイム）
+# 現在価格取得
 # =====================================================
 def get_current_price(ticker_code, market):
-    """yfinanceで現在価格を取得（fast_info → 分足）"""
+    """
+    現在価格取得（fast_info → 1分足）
+    """
     try:
         ticker_code = str(ticker_code).replace(".0", "")
         if market == "japan":
@@ -68,7 +73,7 @@ def get_current_price(ticker_code, market):
 
         # ① fast_info（最優先）
         info = ticker.fast_info
-        if info and "last_price" in info and info["last_price"] is not None:
+        if info and info.get("last_price") is not None:
             return float(info["last_price"])
 
         # ② 直近1日の1分足
@@ -84,11 +89,11 @@ def get_current_price(ticker_code, market):
 
 
 # =====================================================
-# 保有中トレードの評価損益計算
+# 保有中トレードの評価損益
 # =====================================================
 def calculate_unrealized_pnl(df, market):
     """
-    保有中銘柄のみ：
+    保有中銘柄：
     (現在値 − 買付単価) × 買付数量
     """
 
@@ -134,20 +139,20 @@ def calculate_unrealized_pnl(df, market):
 
 
 # =====================================================
-# 売却済フィルタ
+# 売却済トレード抽出
 # =====================================================
 def filter_closed_trades(df):
     return df[df["ステータス"] == "売却済"].copy()
 
 
 # =====================================================
-# 売却済 + 保有中 を統合（表示用）
+# 売却済 + 保有中（表示用）
 # =====================================================
 def get_all_trades_with_status(df, market):
     closed = filter_closed_trades(df)
     holding = calculate_unrealized_pnl(df, market)
 
-    # --- 売却済（Notion計算そのまま） ---
+    # --- 売却済（Notion 計算をそのまま使用） ---
     closed_fmt = closed[
         ["銘柄名", "証券コード", "買付日", "売付日", "実現損益", "増減率"]
     ].copy()
@@ -167,7 +172,7 @@ def get_all_trades_with_status(df, market):
     else:
         all_trades = closed_fmt
 
-    # 買付日降順（新しい順）
+    # 買付日：降順（新しい順）
     all_trades = (
         all_trades.sort_values("買付日", ascending=False)
         .reset_index(drop=True)
