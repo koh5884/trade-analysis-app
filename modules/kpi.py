@@ -118,45 +118,76 @@ def calculate_equity_curve(df, unrealized_df, capital):
 # =====================================================
 def get_trade_summary_table(df, unrealized_df):
     """
-    個別トレード一覧（表示用）
+    個別トレード一覧（詳細表示用）
     """
 
     rows = []
 
-    # --- 売却済 ---
+    # =========================
+    # 売却済トレード
+    # =========================
     closed = df[df["ステータス"] == "売却済"].copy()
+
     for _, row in closed.iterrows():
         rows.append(
             {
-                "銘柄名": row["銘柄名"],
-                "証券コード": row["証券コード"],
+                "銘柄名": row.get("銘柄名", ""),
+                "証券コード": row.get("証券コード", ""),
                 "ステータス": "売却済",
                 "買付日": row["買付日"].strftime("%Y-%m-%d")
-                if pd.notna(row["買付日"])
+                if pd.notna(row.get("買付日"))
                 else "",
                 "売付日": row["売付日"].strftime("%Y-%m-%d")
-                if pd.notna(row["売付日"])
+                if pd.notna(row.get("売付日"))
                 else "",
-                "損益": row["実現損益"],
-                "増減率": f"{row['増減率']:.2f}%",
+                "買付単価": row.get("買付単価", ""),
+                "売付単価": row.get("売付単価", ""),
+                "買付数量": row.get("買付数量", ""),
+                "損益": row.get("実現損益", 0),
+                "増減率": f"{row.get('増減率', 0):.2f}%",
             }
         )
 
-    # --- 保有中 ---
-    if not unrealized_df.empty:
+    # =========================
+    # 保有中トレード
+    # =========================
+    if unrealized_df is not None and not unrealized_df.empty:
         for _, row in unrealized_df.iterrows():
             rows.append(
                 {
-                    "銘柄名": row["銘柄名"],
-                    "証券コード": row["証券コード"],
+                    "銘柄名": row.get("銘柄名", ""),
+                    "証券コード": row.get("証券コード", ""),
                     "ステータス": "保有中",
                     "買付日": row["買付日"].strftime("%Y-%m-%d")
-                    if pd.notna(row["買付日"])
+                    if pd.notna(row.get("買付日"))
                     else "",
                     "売付日": "-",
-                    "損益": row["損益"],
-                    "増減率": f"{row['増減率']:.2f}%",
+                    "買付単価": row.get("買付単価", ""),
+                    "売付単価": "-",
+                    "買付数量": row.get("数量", ""),
+                    "損益": row.get("損益", 0),
+                    "増減率": f"{row.get('増減率', 0):.2f}%",
                 }
             )
 
-    return pd.DataFrame(rows)
+    # =========================
+    # DataFrame化 & 列順固定
+    # =========================
+    summary_df = pd.DataFrame(rows)
+
+    display_columns = [
+        "銘柄名",
+        "証券コード",
+        "ステータス",
+        "買付日",
+        "売付日",
+        "買付単価",
+        "売付単価",
+        "買付数量",
+        "損益",
+        "増減率",
+    ]
+
+    summary_df = summary_df[display_columns]
+
+    return summary_df
