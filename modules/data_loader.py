@@ -152,27 +152,43 @@ def get_all_trades_with_status(df, market):
     closed = filter_closed_trades(df)
     holding = calculate_unrealized_pnl(df, market)
 
-    # --- 売却済（Notion 計算をそのまま使用） ---
-    closed_fmt = closed[
-        ["銘柄名", "証券コード", "買付日", "売付日", "実現損益", "増減率"]
-    ].copy()
+    # --- 売却済 ---
+    closed_fmt = closed.copy()
     closed_fmt["ステータス"] = "売却済"
     closed_fmt["損益"] = closed_fmt["実現損益"]
 
-    # --- 保有中（評価損益） ---
+    # --- 保有中 ---
     if not holding.empty:
-        holding_fmt = holding[
-            ["銘柄名", "証券コード", "買付日", "含み損益", "増減率"]
-        ].copy()
-        holding_fmt["売付日"] = None
-        holding_fmt["損益"] = holding_fmt["含み損益"]
+        holding_fmt = holding.copy()
         holding_fmt["ステータス"] = "保有中"
+        holding_fmt["売付日"] = None
+        holding_fmt["売付単価"] = None
+        holding_fmt["損益"] = holding_fmt["含み損益"]
 
         all_trades = pd.concat([closed_fmt, holding_fmt], ignore_index=True)
     else:
         all_trades = closed_fmt
 
-    # 買付日：降順（新しい順）
+    # --- 表示用に列順を統一 ---
+    display_columns = [
+        "銘柄名",
+        "証券コード",
+        "ステータス",
+        "買付日",
+        "売付日",
+        "買付単価",
+        "売付単価",
+        "買付数量",
+        "損益",
+        "増減率",
+    ]
+
+    # 存在する列だけ使う（安全対策）
+    display_columns = [c for c in display_columns if c in all_trades.columns]
+
+    all_trades = all_trades[display_columns]
+
+    # 買付日で降順
     all_trades = (
         all_trades.sort_values("買付日", ascending=False)
         .reset_index(drop=True)
